@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wireguard-webapp-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${WG_CONFIG_DIR:-/etc/wireguard}:/etc/wireguard:ro
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: wireguard-webapp-nginx
+    restart: unless-stopped
+    depends_on:
+      - app
+    env_file:
+      - .env
+    environment:
+      NGINX_LISTEN_PORT: ${NGINX_LISTEN_PORT:-8080}
+      APP_UPSTREAM_HOST: ${APP_UPSTREAM_HOST:-127.0.0.1}
+      APP_UPSTREAM_PORT: ${APP_UPSTREAM_PORT:-8000}
+    volumes:
+      - ./deploy/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    network_mode: host
