@@ -24,14 +24,49 @@ if [[ ! -f .env ]]; then
   fi
 fi
 
-# shellcheck disable=SC1091
-set -a
-source .env
-set +a
+get_env_value() {
+  local key="$1"
+  local default_value="$2"
+  local raw
 
-LISTEN_PORT="${LISTEN_PORT:-8000}"
-APP_UPSTREAM_PORT="${APP_UPSTREAM_PORT:-${LISTEN_PORT}}"
-NGINX_LISTEN_PORT="${NGINX_LISTEN_PORT:-8080}"
+  raw="$(
+    awk -v key="${key}" '
+      /^[[:space:]]*#/ { next }
+      /^[[:space:]]*$/ { next }
+      {
+        line = $0
+        sub(/^[[:space:]]+/, "", line)
+        if (index(line, key "=") == 1) {
+          value = substr(line, length(key) + 2)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+          # Strip optional wrapping quotes.
+          if (value ~ /^".*"$/ || value ~ /^'\''.*'\''$/) {
+            value = substr(value, 2, length(value) - 2)
+          }
+          out = value
+        }
+      }
+      END { print out }
+    ' .env
+  )"
+
+  if [[ -n "${raw}" ]]; then
+    printf '%s' "${raw}"
+  else
+    printf '%s' "${default_value}"
+  fi
+}
+
+LISTEN_PORT="$(get_env_value "LISTEN_PORT" "8000")"
+APP_UPSTREAM_PORT="$(get_env_value "APP_UPSTREAM_PORT" "${LISTEN_PORT}")"
+NGINX_LISTEN_PORT="$(get_env_value "NGINX_LISTEN_PORT" "8080")"
+
+for port in "${LISTEN_PORT}" "${APP_UPSTREAM_PORT}" "${NGINX_LISTEN_PORT}"; do
+  if [[ ! "${port}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Invalid port value '${port}' in .env."
+    exit 1
+  fi
+done
 
 if [[ "${LISTEN_PORT}" == "${NGINX_LISTEN_PORT}" ]]; then
   echo "ERROR: LISTEN_PORT (${LISTEN_PORT}) cannot be the same as NGINX_LISTEN_PORT (${NGINX_LISTEN_PORT})."
