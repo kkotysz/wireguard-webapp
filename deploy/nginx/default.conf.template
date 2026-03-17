@@ -2,6 +2,9 @@ server {
     listen ${NGINX_LISTEN_PORT};
     server_name _;
 
+    # Prevent 400 "Request Header Or Cookie Too Large" for hosts with many cookies.
+    client_header_buffer_size 16k;
+    large_client_header_buffers 4 32k;
     client_max_body_size 10m;
 
     location / {
