@@ -1,51 +1,105 @@
-# wireguard-webapp
+# WireGuard Web App
 
-Uniwersalny panel statusu WireGuard (Flask) z API JSON, uruchamiany produkcyjnie w Dockerze przez Gunicorn + Nginx.
+[![Docker build](https://github.com/kkotysz/wireguard-webapp/actions/workflows/docker.yml/badge.svg)](https://github.com/kkotysz/wireguard-webapp/actions/workflows/docker.yml)
 
-## Co jest konfigurowalne
+A lightweight operational dashboard for **monitoring WireGuard peers on a Linux host**, exposed through a Flask web interface and JSON API and deployed with Docker, Gunicorn and Nginx.
 
-Całość jest sterowana przez `.env`:
+The project is intentionally small, but it demonstrates a complete infrastructure-oriented delivery path: host networking, containerization, reverse proxying, health checks, environment-based configuration and a simple status API.
 
-- `WG_IFACE` - nazwa interfejsu WireGuard (np. `wg0`, `wg1`)
-- `WG_CONF` - ścieżka do pliku konfiguracyjnego (opcjonalna; domyślnie `/etc/wireguard/<WG_IFACE>.conf`)
-- `HANDSHAKE_FRESH_SECONDS` - po ilu sekundach peer jest traktowany jako `idle`
-- `AUTO_REFRESH_SECONDS` - auto-odświeżanie UI
-- `NGINX_LISTEN_PORT` - port publiczny Nginx
+## Engineering highlights
 
-Pełna lista: `.env.example`.
+- **Linux networking integration** — reads the state of a host WireGuard interface from inside the application container.
+- **Containerized deployment** — Docker image plus Docker Compose configuration.
+- **Production-style serving** — Flask behind Gunicorn and Nginx.
+- **Operational visibility** — peer status, last handshake information and traffic-related state exposed in a browser-friendly dashboard.
+- **JSON API** — machine-readable status endpoint for integrations or monitoring.
+- **Health check** — dedicated `/health` endpoint for service supervision.
+- **Environment-driven configuration** — interface name, config location, refresh interval and deployment port can be changed without editing application code.
+- **Deployment helper** — repository includes a shell-based deployment workflow and Nginx template.
 
-## Szybki start (Docker)
+## Architecture
 
-1. Skopiuj konfigurację:
+```text
+browser / API client
+        |
+      Nginx
+        |
+     Gunicorn
+        |
+      Flask
+        |
+WireGuard state on Linux host
+```
+
+The application container uses host networking so it can inspect WireGuard interfaces managed by the host operating system.
+
+## Quick start
+
+### Requirements
+
+- Linux host with WireGuard configured and running
+- Docker
+- Docker Compose
+
+Clone the repository:
+
+```bash
+git clone https://github.com/kkotysz/wireguard-webapp.git
+cd wireguard-webapp
+```
+
+Create local configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Ustaw wartości w `.env` (minimum `WG_IFACE`, opcjonalnie `WG_CONF`).
-
-3. Uruchom stack:
+Adjust the values in `.env`, then start the stack:
 
 ```bash
 docker compose up -d --build
 ```
 
-4. Otwórz w przeglądarce:
+Open:
 
 ```text
-http://<IP_SERWERA>:<NGINX_LISTEN_PORT>
+http://<SERVER_IP>:<NGINX_LISTEN_PORT>
 ```
 
-## Wymagania hosta
+## Configuration
 
-- Linux z aktywnym WireGuardem
-- Docker + Docker Compose
-- Dostęp do konfiguracji WireGuarda pod ścieżką z `WG_CONFIG_DIR` (domyślnie `/etc/wireguard`)
+The application is configured through environment variables. Important options include:
 
-Uwaga: Compose używa `network_mode: host`, aby kontener aplikacji widział interfejsy WireGuard hosta.
+- `WG_IFACE` — WireGuard interface name, e.g. `wg0` or `wg1`
+- `WG_CONF` — optional path to the WireGuard configuration file
+- `HANDSHAKE_FRESH_SECONDS` — age threshold used to classify peer activity
+- `AUTO_REFRESH_SECONDS` — browser refresh interval
+- `NGINX_LISTEN_PORT` — externally exposed Nginx port
 
-## Endpointy
+See [`.env.example`](.env.example) for the complete configuration template.
 
-- `/` - panel WWW
-- `/api/status` - JSON status
-- `/health` - healthcheck
+## Endpoints
+
+- `/` — web dashboard
+- `/api/status` — JSON WireGuard status
+- `/health` — service health check
+
+## Deployment notes
+
+Docker Compose uses `network_mode: host` for the application container. This is deliberate: the service needs visibility into WireGuard interfaces on the Linux host.
+
+The repository includes:
+
+```text
+Dockerfile
+docker-compose.yml
+gunicorn.conf.py
+deploy/nginx/default.conf.template
+deploy.sh
+```
+
+Together they provide a compact example of packaging and deploying a small infrastructure service from application code through reverse proxy configuration.
+
+## Project scope
+
+This repository is designed as a focused utility rather than a large platform. Its main value is practical integration of **Python application code, Linux networking and containerized operations** in a small deployable service.
